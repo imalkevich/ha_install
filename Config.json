@@ -1,0 +1,13 @@
+{
+    "homeAssistant": {
+        "url": "",
+        "wsUrl": "",
+        "username": "",
+        "password": ""
+    },
+    "addons": [
+        {
+            "url": "https://github.com/FunkeyFlo/ps5-mqtt"
+        }
+    ]
+}
