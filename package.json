@@ -1,0 +1,16 @@
+{
+  "name": "ha_install",
+  "version": "1.0.0",
+  "description": "Install HA add-on automatically",
+  "main": "index/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.27.2",
+    "axios-retry": "^3.3.1",
+    "ws": "^8.8.1"
+  }
+}
