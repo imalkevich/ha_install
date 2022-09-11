@@ -1,13 +1,19 @@
 {
     "homeAssistant": {
-        "url": "",
-        "wsUrl": "",
         "username": "",
-        "password": ""
+        "password": "",
+        "addonUrl": "https://github.com/arthurdent75/SimpleScheduler"
     },
-    "addons": [
-        {
-            "url": "https://github.com/FunkeyFlo/ps5-mqtt"
+    "discovery": {
+        "homeAssistant": {
+            "protocol": "http:",
+            "port": 8123,
+            "path": "/"
+        },
+        "adminUi": {
+            "protocol": "https:",
+            "port": 5511,
+            "path": "/api/v1/discovery"
         }
-    ]
+    }
 }

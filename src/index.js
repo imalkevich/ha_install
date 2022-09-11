@@ -1,5 +1,6 @@
-const CONFIGURATION = require('../Config.json');
-const installer = require('./installer');
+const orchestrator = require('./orchestrator');
 
-const installerApp = new installer.Installer(CONFIGURATION.homeAssistant, CONFIGURATION.addons);
-installerApp.install();
+const orchestratorApp = new orchestrator.Orchestrator();
+orchestratorApp.install();
+
+

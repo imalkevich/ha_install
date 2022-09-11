@@ -9,9 +9,8 @@ axiosRetry(axios, {
 });
 
 class Installer {
-    constructor(haConfig, addOns) {
+    constructor(haConfig) {
         this.haConfig = haConfig;
-        this.addOns = addOns;
 
         this._websocket = null;
         this._commandId = 0;
@@ -30,89 +29,96 @@ class Installer {
 
         console.log('Connected to Home Assistant websocket');
 
-        for (const addOn of this.addOns) {
-            const installedAddOn = await this._checkAddOnInstalled(addOn.url);
+        console.log(`Installing add-on ${this.haConfig.addonUrl}`);
 
-            if (installedAddOn) {
-                console.log(`${installedAddOn.name} from ${installedAddOn.url} is already installed`);
+        const installedAddOn = await this._checkAddOnInstalled(this.haConfig.addonUrl);
+
+        if (installedAddOn) {
+            console.log(`${installedAddOn.name} from ${installedAddOn.url} is already installed`);
+
+            const startAddon = await this._checkAddonStarted(installedAddOn.slug);
+
+            if (!startAddon) {
+                console.error(`Failed to start add-on ${installedAddOn.name} from ${installedAddOn.url}`);
+            }
+
+            return { success: true };
+        }
+
+        const { result: repositoriesResult } = await this._getRepositories();
+
+        const repository = repositoriesResult?.find((r) => r.url === this.haConfig.addonUrl);
+
+        if (!repository) {
+            console.log(`Adding add-on repository ${this.haConfig.addonUrl} ...`);
+
+            const { success, error } = await this._addRepository(this.haConfig.addonUrl);
+
+            if (success) {
+                console.log(`Adding add-on repository ${this.haConfig.addonUrl} has been configured`);
+            } else {
+                return { success: false, message: `Failed to add add-on repository ${this.haConfig.addonUrl}: ${JSON.stringify(error)}` };
+            }
+        } else {
+            console.log(`Add-on repository ${this.haConfig.addonUrl} is already configured`);
+        }
+
+        const { result: storeResult } = await this._getStore();
+
+        const addOnToInstall = storeResult?.addons?.find((a) => a.url?.startsWith(this.haConfig.addonUrl));
+
+        if (!addOnToInstall) {
+            return { success: false, message: `Failed to find add-on from ${this.haConfig.addonUrl}` };
+        }
+
+        console.log(`Installing add-on ${addOnToInstall.name} from ${addOnToInstall.url} ...`);
+
+        const { success: installSuccess, error: installError } = await this._installAddon(addOnToInstall.slug);
+
+        if (installSuccess) {
+            console.log(`Add-on ${addOnToInstall.name} has been installed`);
+
+            const startAddon = await this._checkAddonStarted(installedAddOn.slug);
+
+            if (!startAddon) {
+                return { success: false, message: `Failed to start add-on ${installedAddOn.name} from ${installedAddOn.url}` };
+            }
+        } else if (installError.message === '') {
+            console.log(`Installation of add-on ${addOnToInstall.name} hasn't indicated success, but it might take some time for the system to update`);
+
+            let installed = false;
+            // Wait for 5 mins for the add-on to be installed
+            for (let attempt = 0; attempt <= 12 * 5; attempt++) {
+                console.log(`Wait for 5 sec and check add-on installation status again (attempt #${attempt + 1}) ...`);
+                await this._delay(5 * 1000);
+
+                const confirmAddOnInstalled = await this._checkAddOnInstalled(addOn.url);
+
+                if (confirmAddOnInstalled) {
+                    console.info(`${confirmAddOnInstalled.name} from ${confirmAddOnInstalled.url} is installed`);
+
+                    installed = true;
+                    break;
+                }
+            }
+
+            if (installed) {
+                console.log(`Starting add-on ${installedAddOn.name}`);
 
                 const startAddon = await this._checkAddonStarted(installedAddOn.slug);
 
                 if (!startAddon) {
-                    console.error(`Failed to start add-on ${installedAddOn.name} from ${installedAddOn.url}`);
+                    return { success: false, message: `Failed to start add-on ${installedAddOn.name} from ${installedAddOn.url}` };
                 }
 
-                continue;
-            }
-
-            const { result: repositoriesResult } = await this._getRepositories();
-
-            const repository = repositoriesResult?.find((r) => r.url === addOn.url);
-
-            if (!repository) {
-                console.log(`Adding add-on repository ${addOn.url} ...`);
-
-                const { success } = await this._addRepository(addOn.url);
-
-                if (success) {
-                    console.log(`Adding add-on repository ${addOn.url} has been configured`);
-                } else {
-                    throw new Error(`Failed to add add-on repository ${addOn.url}`);
-                }
             } else {
-                console.log(`Add-on repository ${addOn.url} is already configured`);
+                return { success: false, message: `Add-on ${addOnToInstall.name} from ${addOnToInstall.url} wasn't installed ...` };
             }
-
-            const { result: storeResult } = await this._getStore();
-
-            const addOnToInstall = storeResult?.addons?.find((a) => a.url?.startsWith(addOn.url));
-
-            if (!addOnToInstall) {
-                throw new Error(`Failed to find add-on from ${addOn.url}`);
-            }
-
-            console.log(`Installing add-on ${addOnToInstall.name} from ${addOnToInstall.url} ...`);
-
-            const { success: installSuccess, error: installError } = await this._installAddon(addOnToInstall.slug);
-
-            if (installSuccess) {
-                console.log(`Add-on ${addOnToInstall.name} has been installed`);
-            } else if (installError.message === '') {
-                console.log(`Installation of add-on ${addOnToInstall.name} hasn't indicated success, but it might take some time for the system to update`);
-
-                let installed = false;
-                for (let attempt = 0; attempt <= 12; attempt++) {
-                    console.log(`Wait for 5 sec and check add-on installation status again (attempt #${attempt + 1}) ...`);
-                    await this._delay(5 * 1000);
-
-                    const confirmAddOnInstalled = await this._checkAddOnInstalled(addOn.url);
-
-                    if (confirmAddOnInstalled) {
-                        console.success(`${confirmAddOnInstalled.name} from ${confirmAddOnInstalled.url} is installed`);
-
-                        installed = true;
-                        break;
-                    }
-                }
-
-                if (installed) {
-                    console.log(`Starting add-on ${installedAddOn.name}`);
-
-                    const startAddon = await this._checkAddonStarted(installedAddOn.slug);
-
-                    if (!startAddon) {
-                        console.error(`Failed to start add-on ${installedAddOn.name} from ${installedAddOn.url}`);
-                    }
-
-                } else {
-                    console.error(`Add-on ${addOnToInstall.name} from ${addOnToInstall.url} wasn't installed ...`);
-                }
-            } else {
-                console.error(`Failed to install add-on ${addOnToInstall.name}: ${installError.message}`);
-            }
+        } else {
+            return { success: false, message: `Failed to install add-on ${addOnToInstall.name}: ${installError.message}` };
         }
 
-        console.log(`${this.addOns.length} add-on(s) processed`);
+        return { success: true };
     }
 
     async login() {
@@ -220,7 +226,7 @@ class Installer {
     }
 
     _receiveCommand(data) {
-        const { id, type } = data;
+        const { id } = data;
 
         if (this._promisesById[id]) {
             console.debug(`Found callback handler by id: ${id}`);
